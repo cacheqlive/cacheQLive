@@ -8,16 +8,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/alyviam/cacheQLive.git"
+    "url": "git+https://github.com/cacheqlive/cacheQLive.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/alyviam/cacheQLive/issues"
+    "url": "https://github.com/cacheqlive/cacheQLive/issues"
   },
-  "homepage": "https://github.com/alyviam/cacheQLive#readme",
+  "homepage": "https://github.com/cacheqlive/cacheQLive#readme",
   "dependencies": {
+    "apollo-cache-inmemory": "^1.6.0",
     "lodash": "^4.17.11"
-  }
+  },
 }

@@ -1,7 +1,11 @@
 import { InMemoryCache } from 'apollo-cache-inmemory';
-
 const _ = require('lodash');
 
+/**
+ * getQueryName takes in a query AST and drills down to get the "value" property from the OperationDefinition.
+ * This function, in short, returns the "name" of a query.
+ * *** IMPORTANT: This file assumes that all queries are NAMED!!!
+ */
 /*
 
 retrieveQueryName() traverses through the AST (Abstract-Syntax-Tree) to aquire the current query's name, in order to compare against queries already cached.
@@ -34,44 +38,75 @@ const retrieveQueryName = (currentQuery) => {
 }
 
 
-//mainQueryNames should be an array of strings where the strings are the names of the queries to be stored as denormalized documents;
-//configObject should be the default configuration object that you would usually pass to InMemoryCache;
 
-class cacheQLive extends InMemoryCache {
-	constructor(mainQueryNames, configObject) {
-		super(configObject);
+
+//mainQueryNames should be an array of strings where the strings are the names of the queries to be stored as denormalized documents;
+//configObject should be the default configuration object that you would usually pass to InMemoryCache to configure its behavior;
+
+export default class cacheQLive extends InMemoryCache {
+	constructor(mainQueryNames, configOptions) {
+		super(configOptions);
 		this.mainQueryNames = mainQueryNames;
 	}
 
-	//these methods need to be fixed to account for an array of initial queries instead of just a single initial query; we do think that they are necessary though since we want to store in our optimized cache and in the IMC;
-	// extract(optimistic) {
-	// 	const normalizedCache = super.extract(optimistic);
-	// 	return { _INITIAL_QUERY: this._INITIAL_QUERY, ...normalizedCache };
-	// }
-	// restore(data) {
-	// 	this._INITIAL_QUERY = data._INITIAL_QUERY;
-	// 	return super.restore(data);
-	// }
+  /**
+   * Usually, extract returns a serialized version of the ApolloCache which will be passed to "restore" client-side.
+   * The extract serialized format doesn't matter so long as "restore" properly de-serializes it.
+   * That's the GENERAL functionality -- we may modify it below.
+   */
+  extract(optimistic) {
+    const normalizedCache = super.extract(optimistic);
+    return {
+      _INITIAL_QUERY: this._INITIAL_QUERY,
+      ...normalizedCache
+    };
+  }
 
-	reset() {
-		this.mainQueryNames = null;
-		return super.reset();
-	}
+  /**
+   * Restore is the counterpart to "extract". It takes the output of "extract" and uses it to populate the cache with the given serialized data passed in as args.
+   */
+  restore(data) {
+    this._INITIAL_QUERY = data._INITIAL_QUERY;
+    return super.restore(data);
+  }
 
-	// write(write) {
-	// 	//if the initialQuery name exists, if the name is under the OperationDefinition, and it's not the inital query requested...
-	// 	if (this.initialQueryName && this.initialQueryName === getQueryName(write.query) && !this._INITIAL_QUERY) {
-	// 		this._INITIAL_QUERY = {
-	// 			result: write.result,
-	// 			variables: write.variables
-	// 		}
-	// 		//broadcastWatches "broadcasts" changes that are made by writing to the cache or the server(it works with optimistic in the sense that the UI is updated before the changes are broadcast to the cache)
-	// 		super.broadcastWatches();
-	// 		return;
-	// 	}
-	// 	super.write(write);
-	// }
+  /**
+   * Reset clears the cache contents.
+   */
+  reset() {
+    this._INITIAL_QUERY = null;
+    return super.reset();
+  }
 
+  /**
+   * The main write method which "writeQuery" and "writeFragment" use to write the results of a GraphQL query or fragment to the store. 
+   * Just like "read", ApolloCache provides implementations for "writeQuery" and "writeFragment", so all that's required is a "read" implementation
+   */
+  // OUR ATTEMPT AT MODIFYING BEHAVIOR TO ALLOW FOR N "WatchedQueries"
+  write(write) {
+    // FIRST check that 1. we've had something passed in to the constructor as a query name to watch 
+    // AND that 2. the query name that we're watching is equal to the queryName of the query that we're writing
+    // AND that 3. we haven't yet written to the _INITIAL_QUERY property in our optimizedCache.
+
+    const writeQueryName = retrieveQueryName(write.query); //Something like "GETAUTHORS"
+
+    if (
+      this.initialQueryNames &&
+      this.initialQueryNames.includes(writeQueryName) //&&
+      // !this._INITIAL_QUERY //THIS MAY CHANGE... This makes sense for his 1 initial big query, but perhaps not for ours
+    ) {
+      // Save the first query, don't normalize this to the cache
+      this[writeQueryName] = {
+        result: write.result, //?
+        variables: write.variables //?
+      };
+      super.broadcastWatches(); // What does this do? Unsure! See: https://github.com/apollographql/apollo-client/blob/master/packages/apollo-cache-inmemory/src/inMemoryCache.ts
+      console.log(this)
+      return;
+    }
+    console.log(this)
+    super.write(write);
+  }
 
 	read(query) {
 		//if you read the initial query from the cache, just return that entire document result
@@ -84,7 +119,7 @@ class cacheQLive extends InMemoryCache {
 
 	diff(query) {
 		//if you want to request the initial query from the cache, we return the entire document result and set the flag to true because we know the whole document is present;
-		if (this.useInitialQuery(query)) {
+		if (this.findMainQueries(query)) {
 			return { result: this._INITIAL_QUERY.result, complete: true };
 		}
 		//otherwise, use the diff method on IMC, which will return as many cached fields for a query as possible and will also return a boolean stating whether or not all of the fields of the query were returned;
