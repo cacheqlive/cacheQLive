@@ -1,0 +1,24 @@
+{
+  "name": "cacheQLive",
+  "version": "1.0.0",
+  "description": "Production Project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sasilver75/cacheQLive.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sasilver75/cacheQLive/issues"
+  },
+  "homepage": "https://github.com/sasilver75/cacheQLive#readme",
+  "dependencies": {
+    "apollo-cache-inmemory": "^1.6.0",
+    "lodash": "^4.17.11"
+  }
+}
