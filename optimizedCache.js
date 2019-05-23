@@ -1,54 +1,41 @@
-import { InMemoryCache } from 'apollo-cache-inmemory';
+import {
+  InMemoryCache
+} from 'apollo-cache-inmemory';
 const _ = require('lodash');
 
 /**
- * getQueryName takes in a query AST and drills down to get the "value" property from the OperationDefinition.
+ * retrieveQueryName takes in a query AST and drills down to get the "value" property from the OperationDefinition.
  * This function, in short, returns the "name" of a query.
  * *** IMPORTANT: This file assumes that all queries are NAMED!!!
  */
-/*
+const retrieveQueryName = (query) => {
+  const defs = query.definitions;
+  if (defs && defs.length) {
+    const operationDefinition = defs.filter(
+      ({
+        kind
+      }) => kind === 'OperationDefinition'
+    );
+    return (
+      operationDefinition.length &&
+      operationDefinition[0].name &&
+      operationDefinition[0].name.value
+    );
+  }
+  return null;
+};
 
-retrieveQueryName() traverses through the AST (Abstract-Syntax-Tree) to aquire the current query's name, in order to compare against queries already cached.
-In order to retrieve query name via path in retrieveQueryName(), query must be written in this format: 
-
-		query <query_name>(<optional_arguments>) {
-			selection set(<optional_arguments>) {
-				sub-selection set {
-				
-				}
-			}
-		}
-
-The name property on the OperationDefinition object references the actual name of the query; i.e. in query getFeed, getFeed is the name value.
-
-*/
-
-const retrieveQueryName = (currentQuery) => {
-	const definitions = query.definitions;
-	if (definitions && definitions.length) {
-		const operationDefinition = definitions.filter(
-			({ kind }) => kind === 'OperationDefinition'
-		);
-		return (
-			operationDefinition[i].name &&
-			operationDefinition[i].name.value
-		);
-	}
-	return null;
-}
-
-
-
-
-//initialQueryNames should be an array of strings where the strings are the names of the queries to be stored as denormalized documents;
-//configObject should be the default configuration object that you would usually pass to InMemoryCache to configure its behavior;
-
-
+/**
+ * Optimized version of InMemoryCache which caches the first execution 
+ * of `initialQueryName` named query for the initial pageload.
+ */
 export default class cacheQLive extends InMemoryCache {
-	constructor(initialQueryNames = [], configOptions) {
-		super(configOptions);
-		this.initialQueryNames = initialQueryNames;
-	}
+  // initalQueryNames is an array of strings that represent the names of the queries that we want to be inserted as documents into our cache.
+  // configOptions is the "usual" object that is passed to InMemoryCache to configure its behaviour.
+  constructor(initialQueryNames = [], configOptions) {
+    super(configOptions);
+    this.initialQueryNames = initialQueryNames;
+  }
 
   /**
    * Usually, extract returns a serialized version of the ApolloCache which will be passed to "restore" client-side.
@@ -109,32 +96,42 @@ export default class cacheQLive extends InMemoryCache {
     super.write(write);
   }
 
-	read(query) {
-		//if you read the initial query from the cache, just return that entire document result
-		if (this.useInitialQuery(query)) {
-			return this._INITIAL_QUERY.result;
-		}
-		//otherwise, default to the IMC read property;
-		return super.read(query)
-	}
+  read(query) {
+    //if you read the initial query from the cache, just return that entire document result
+    if (this.findMainQueries(query)) {
+      return this._INITIAL_QUERY.result;
+    }
+    //otherwise, default to the IMC read property;
+    return super.read(query)
+  }
 
-	diff(query) {
-		//if you want to request the initial query from the cache, we return the entire document result and set the flag to true because we know the whole document is present;
-		if (this.useInitialQuery(query)) {
-			return { result: this._INITIAL_QUERY.result, complete: true };
-		}
-		//otherwise, use the diff method on IMC, which will return as many cached fields for a query as possible and will also return a boolean stating whether or not all of the fields of the query were returned;
-		//this is probably where we need to add the logic to catch that true or false flag and then determine which parts of the query weren't in the cache, and restructure the rest of the query that needs to be sent to get all of the requested data;
-		return super.diff(query)
-	}
+  diff(query) {
+    //if you want to request the initial query from the cache, we return the entire document result and set the flag to true because we know the whole document is present;
+    if (this.findMainQueries(query)) {
+      return {
+        result: this._INITIAL_QUERY.result,
+        complete: true
+      };
+    }
+    //otherwise, use the diff method on IMC, which will return as many cached fields for a query as possible and will also return a boolean stating whether or not all of the fields of the query were returned;
+    //this is probably where we need to add the logic to catch that true or false flag and then determine which parts of the query weren't in the cache, and restructure the rest of the query that needs to be sent to get all of the requested data;
+    return super.diff(query)
+  }
 
-	useInitialQuery(query) {
-    const currentQueryName = retrieveQueryName(query.query);
+
+  /**
+   * This looks like a method that Jeff added, lol. It's used as a helper method in both "read" and "diff".
+   * It seeeeems like this method returns true if the query that's passed in represents the same data as the Big Document stored in the cache.
+   */
+
+  useInitialQuery(query) {
+    const currentQueryName = retrieveQueryName(query.query); //Something like "GETAUTHORS"
+
     return (
       this.initialQueryNames &&
       this.initialQueryNames.includes(currentQueryName) &&
+      this[currentQueryName] &&
       _.isEqual(this[currentQueryName].variables, query.variables)
     )
-	}
-
+  }
 }
