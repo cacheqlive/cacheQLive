@@ -135,4 +135,15 @@ export default class OptimizedInMemoryCache extends InMemoryCache {
       _.isEqual(this._INITIAL_QUERY.variables, query.variables) // This isEqual method isn't native to Javascript... we imported lodash, which has an isEqual method
     );
   }
+
+  useInitialQuery(query) {
+    const queryName = getQueryName(query.query); //Something like "GETAUTHORS"
+
+    return (
+      this.initialQueryNames &&
+      this.initialQueryNames.includes(queryName) &&
+      this[queryName] &&
+      _.isEqual(this[queryName].variables, query.variables)
+    )
+  }
 }
