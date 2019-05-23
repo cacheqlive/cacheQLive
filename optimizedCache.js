@@ -40,13 +40,14 @@ const retrieveQueryName = (currentQuery) => {
 
 
 
-//mainQueryNames should be an array of strings where the strings are the names of the queries to be stored as denormalized documents;
+//initialQueryNames should be an array of strings where the strings are the names of the queries to be stored as denormalized documents;
 //configObject should be the default configuration object that you would usually pass to InMemoryCache to configure its behavior;
 
+
 export default class cacheQLive extends InMemoryCache {
-	constructor(mainQueryNames, configOptions) {
+	constructor(initialQueryNames = [], configOptions) {
 		super(configOptions);
-		this.mainQueryNames = mainQueryNames;
+		this.initialQueryNames = initialQueryNames;
 	}
 
   /**
@@ -110,7 +111,7 @@ export default class cacheQLive extends InMemoryCache {
 
 	read(query) {
 		//if you read the initial query from the cache, just return that entire document result
-		if (this.findMainQueries(query)) {
+		if (this.useInitialQuery(query)) {
 			return this._INITIAL_QUERY.result;
 		}
 		//otherwise, default to the IMC read property;
@@ -119,7 +120,7 @@ export default class cacheQLive extends InMemoryCache {
 
 	diff(query) {
 		//if you want to request the initial query from the cache, we return the entire document result and set the flag to true because we know the whole document is present;
-		if (this.findMainQueries(query)) {
+		if (this.useInitialQuery(query)) {
 			return { result: this._INITIAL_QUERY.result, complete: true };
 		}
 		//otherwise, use the diff method on IMC, which will return as many cached fields for a query as possible and will also return a boolean stating whether or not all of the fields of the query were returned;
@@ -127,20 +128,13 @@ export default class cacheQLive extends InMemoryCache {
 		return super.diff(query)
 	}
 
-	findMainQueries(query) {
-		const currentQueryName = retrieveQueryName(query);
-		for (let i = 0; i < mainQueryNames.length; i += 1) {
-			if (mainQueryNames[i] === currentQueryName) {
-				if (_.isEqual(query.variable))
-			}
-		}
-		return (
-			this.initialQueryName &&
-			this.initialQueryName === retrieveQueryName(query.query) &&
-			this._INITIAL_QUERY &&
-			_.isEqual(this._INITIAL_QUERY.variable, query.variable)
-			//query.VariableDefinition.variable.name.value
-		)
+	useInitialQuery(query) {
+    const currentQueryName = retrieveQueryName(query.query);
+    return (
+      this.initialQueryNames &&
+      this.initialQueryNames.includes(currentQueryName) &&
+      _.isEqual(this[currentQueryName].variables, query.variables)
+    )
 	}
 
 }
