@@ -1,15 +1,15 @@
-const {
+import {
   InMemoryCache
-} = require('apollo-cache-inmemory');
+} from 'apollo-cache-inmemory'
 
 const _ = require('lodash');
 
 /**
- * getQueryName takes in a query AST and drills down to get the "value" property from the OperationDefinition.
+ * retrieveQueryName takes in a query AST and drills down to get the "value" property from the OperationDefinition.
  * This function, in short, returns the "name" of a query.
  * *** IMPORTANT: This file assumes that all queries are NAMED!!!
  */
-const getQueryName = (query) => {
+const retrieveQueryName = (query) => {
   const defs = query.definitions;
   if (defs && defs.length) {
     const operationDefinition = defs.filter(
@@ -30,7 +30,7 @@ const getQueryName = (query) => {
  * Optimized version of InMemoryCache which caches the first execution 
  * of `initialQueryName` named query for the initial pageload.
  */
-export default class OptimizedInMemoryCache extends InMemoryCache {
+export default class cacheQLive extends InMemoryCache {
   // initalQueryNames is an array of strings that represent the names of the queries that we want to be inserted as documents into our cache.
   // configOptions is the "usual" object that is passed to InMemoryCache to configure its behaviour.
   constructor(initialQueryNames = [], configOptions) {
@@ -77,7 +77,7 @@ export default class OptimizedInMemoryCache extends InMemoryCache {
     // AND that 2. the query name that we're watching is equal to the queryName of the query that we're writing
     // AND that 3. we haven't yet written to the _INITIAL_QUERY property in our optimizedCache.
 
-    const writeQueryName = getQueryName(write.query); //Something like "GETAUTHORS"
+    const writeQueryName = retrieveQueryName(write.query); //Something like "GETAUTHORS"
 
     if (
       this.initialQueryNames &&
@@ -127,23 +127,15 @@ export default class OptimizedInMemoryCache extends InMemoryCache {
    * This looks like a method that Jeff added, lol. It's used as a helper method in both "read" and "diff".
    * It seeeeems like this method returns true if the query that's passed in represents the same data as the Big Document stored in the cache.
    */
-  useInitialQuery(query) {
-    return (
-      this.initialQueryName &&
-      this.initialQueryName === getQueryName(query.query) &&
-      this._INITIAL_QUERY &&
-      _.isEqual(this._INITIAL_QUERY.variables, query.variables) // This isEqual method isn't native to Javascript... we imported lodash, which has an isEqual method
-    );
-  }
 
   useInitialQuery(query) {
-    const queryName = getQueryName(query.query); //Something like "GETAUTHORS"
+    const currentQueryName = retrieveQueryName(query.query); //Something like "GETAUTHORS"
 
     return (
       this.initialQueryNames &&
-      this.initialQueryNames.includes(queryName) &&
-      this[queryName] &&
-      _.isEqual(this[queryName].variables, query.variables)
+      this.initialQueryNames.includes(currentQueryName) &&
+      this[currentQueryName] &&
+      _.isEqual(this[currentQueryName].variables, query.variables)
     )
   }
 }
