@@ -1,7 +1,6 @@
 import {
   InMemoryCache
-} from 'apollo-cache-inmemory'
-
+} from 'apollo-cache-inmemory';
 const _ = require('lodash');
 
 /**
@@ -97,31 +96,28 @@ export default class cacheQLive extends InMemoryCache {
     super.write(write);
   }
 
-  /**
-   * This is the main method which readQuery and readFragment use to fetch the cached results of a given GraphQL query or fragment.
-   * readQuery and readFragment are already implemented on the ApolloCache base class, so all that's required is a read implementation.
-   */
   read(query) {
-    if (this.useInitialQuery(query)) {
+    //if you read the initial query from the cache, just return that entire document result
+    if (this.findMainQueries(query)) {
       return this._INITIAL_QUERY.result;
     }
-    return super.read(query);
+    //otherwise, default to the IMC read property;
+    return super.read(query)
   }
 
-
-  /**
-   * "diff" is a method used by ApolloClient to return as many cached fields for a given GraphQL query as possible... It also returns a FLAG indicating whether or not ALL of the query's
-   * fields were present in the cache. If any are missing, the ApolloClient will need to fetch the additional fields from the server (but I don't believe diff does that for you).
-   */
   diff(query) {
-    if (this.useInitialQuery(query)) {
+    //if you want to request the initial query from the cache, we return the entire document result and set the flag to true because we know the whole document is present;
+    if (this.findMainQueries(query)) {
       return {
         result: this._INITIAL_QUERY.result,
         complete: true
       };
     }
-    return super.diff(query);
+    //otherwise, use the diff method on IMC, which will return as many cached fields for a query as possible and will also return a boolean stating whether or not all of the fields of the query were returned;
+    //this is probably where we need to add the logic to catch that true or false flag and then determine which parts of the query weren't in the cache, and restructure the rest of the query that needs to be sent to get all of the requested data;
+    return super.diff(query)
   }
+
 
   /**
    * This looks like a method that Jeff added, lol. It's used as a helper method in both "read" and "diff".
